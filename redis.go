@@ -66,6 +66,10 @@ func New(config ...Config) *Database {
 }
 
 func GetDatabase(name ...string) (*Database, error) {
+	if len(Databases) == 0 {
+		return nil, errors.New("no databases available")
+	}
+
 	dbName := "main"
 	if len(name) > 0 {
 		dbName = name[0]
