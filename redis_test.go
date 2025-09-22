@@ -23,7 +23,6 @@ func TestRedis(t *testing.T) {
 	defer rds.Close()
 
 	// 값 저장
-
 	err := rds.Set("test", User{
 		Name: "Alice",
 		Age:  18,
