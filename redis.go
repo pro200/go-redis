@@ -2,6 +2,7 @@ package redis
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"runtime"
 	"time"
@@ -9,11 +10,14 @@ import (
 	"github.com/gofiber/storage/redis/v3"
 )
 
-var storage *redis.Storage
-
 type Config redis.Config
 
-func Init(config ...Config) {
+type Store struct {
+	client *redis.Storage
+}
+
+// New 생성자
+func New(config ...Config) *Store {
 	options := redis.Config{
 		Host:      "127.0.0.1",
 		Port:      6379,
@@ -26,94 +30,90 @@ func Init(config ...Config) {
 	}
 
 	if len(config) > 0 {
-		if config[0].Host != "" {
-			options.Host = config[0].Host
+		c := config[0]
+		if c.Host != "" {
+			options.Host = c.Host
 		}
-		if config[0].Port != 0 {
-			options.Port = config[0].Port
+		if c.Port != 0 {
+			options.Port = c.Port
 		}
-		if config[0].Database != 0 {
-			options.Database = config[0].Database
+		if c.Database != 0 {
+			options.Database = c.Database
 		}
-		if config[0].Password != "" {
-			options.Password = config[0].Password
+		if c.Password != "" {
+			options.Password = c.Password
 		}
-		if config[0].Username != "" {
-			options.Username = config[0].Username
+		if c.Username != "" {
+			options.Username = c.Username
 		}
 	}
 
-	storage = redis.New(options)
+	return &Store{client: redis.New(options)}
 }
 
-// Redis에 값을 JSON으로 변환하여 저장
-func Set(key string, value interface{}, ttl ...time.Duration) error {
-	// value를 JSON으로 직렬화
+// Set 값 저장 (JSON 직렬화)
+func (s *Store) Set(key string, value any, ttl ...time.Duration) error {
 	jsonData, err := json.Marshal(value)
 	if err != nil {
-		return fmt.Errorf("failed to marshal value: %w", err)
+		return fmt.Errorf("marshal error: %w", err)
 	}
-
-	// ttl이 없으면 기본값으로 0을 설정
-	if len(ttl) == 0 {
-		ttl = append(ttl, 0)
+	exp := time.Duration(0)
+	if len(ttl) > 0 {
+		exp = ttl[0]
 	}
-
-	// Redis에 JSON 데이터를 저장
-	return storage.Set(key, jsonData, ttl[0])
+	return s.client.Set(key, jsonData, exp)
 }
 
-// Redis에서 JSON값을 가져와 dest구조체로 언마샬링
-func Get(key string, dest interface{}) error {
-	// Redis에서 데이터 가져오기
-	value, err := storage.Get(key)
+// Get 값 조회 (구조체 언마샬링)
+func (s *Store) Get(key string, dest any) error {
+	value, err := s.client.Get(key)
 	if err != nil {
-		return fmt.Errorf("failed to get value from Redis: %w", err)
+		return fmt.Errorf("redis error: %w", err)
 	}
 	if len(value) == 0 {
-		return fmt.Errorf("key not found")
+		return errors.New("key not found")
 	}
-
-	// JSON 데이터를 구조체로 언마샬링
-	if err = json.Unmarshal(value, dest); err != nil {
-		return fmt.Errorf("failed to unmarshal JSON: %w", err)
-	}
-
-	return nil
+	return json.Unmarshal(value, dest)
 }
 
-func GetString(key string) (string, error) {
+func (s *Store) GetString(key string) (string, error) {
 	var data string
-	err := Get(key, &data)
+	err := s.Get(key, &data)
 	return data, err
 }
 
-func GetInt(key string) (int, error) {
+func (s *Store) GetInt(key string) (int, error) {
 	var data int
-	err := Get(key, &data)
+	err := s.Get(key, &data)
 	return data, err
 }
 
-func GetFloat(key string) (float64, error) {
+func (s *Store) GetFloat(key string) (float64, error) {
 	var data float64
-	err := Get(key, &data)
+	err := s.Get(key, &data)
 	return data, err
 }
 
-func GetBool(key string) (bool, error) {
+func (s *Store) GetBool(key string) (bool, error) {
 	var data bool
-	err := Get(key, &data)
+	err := s.Get(key, &data)
 	return data, err
 }
 
-func Reset() error {
-	return storage.Reset()
+// Delete 키 삭제
+func (s *Store) Delete(key string) error {
+	return s.client.Delete(key)
 }
 
-func Delete(key string) error {
-	return storage.Delete(key)
+// Reset 전체 삭제 (안전 장치 추가)
+func (s *Store) Reset(confirm bool) error {
+	if !confirm {
+		return errors.New("reset not confirmed")
+	}
+	return s.client.Reset()
 }
 
-func Close() {
-	_ = storage.Close()
+// Close 종료
+func (s *Store) Close() {
+	s.client.Close()
 }
