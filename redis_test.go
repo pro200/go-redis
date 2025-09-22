@@ -2,6 +2,7 @@ package redis_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/pro200/go-redis"
 )
@@ -16,19 +17,32 @@ func TestRedis(t *testing.T) {
 	})
 	defer rds.Close()
 
-	if err := rds.Set("test", "hello"); err != nil {
-		t.Error(err)
+	// 값 저장
+	err := rds.Set("test", map[string]interface{}{
+		"name": "Alice",
+		"age":  30,
+	}, 10*time.Minute)
+	if err != nil {
+		t.Error("Set error:", err)
 	}
 
-	var result string
-	if err := rds.Get("test", &result); err != nil {
-		t.Error(err)
+	// 구조체로 값 조회
+	var user struct {
+		Name string `json:"name"`
+		Age  int    `json:"age"`
 	}
-	if result != "hello" {
+
+	if err := rds.Get("test", &user); err != nil {
+		t.Error("Get error:", err)
+	}
+
+	if user.Name != "Alice" {
 		t.Error("Wrong result")
 	}
 
-	if err := rds.Delete("test"); err != nil {
-		t.Error(err)
+	// 키 삭제
+	err = rds.Delete("test")
+	if err != nil {
+		t.Error("Delete error:", err)
 	}
 }
