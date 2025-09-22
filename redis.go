@@ -10,14 +10,24 @@ import (
 	"github.com/gofiber/storage/redis/v3"
 )
 
-type Config redis.Config
+type Config struct {
+	Name     string // database 이름
+	Host     string
+	Port     int
+	Database int
+	Username string
+	Password string
+}
 
-type Store struct {
+type Database struct {
 	client *redis.Storage
 }
 
+var Databases = make(map[string]*Database)
+
 // New 생성자
-func New(config ...Config) *Store {
+func New(config ...Config) *Database {
+	dbName := "main"
 	options := redis.Config{
 		Host:      "127.0.0.1",
 		Port:      6379,
@@ -31,6 +41,9 @@ func New(config ...Config) *Store {
 
 	if len(config) > 0 {
 		c := config[0]
+		if c.Name != "" {
+			dbName = c.Name
+		}
 		if c.Host != "" {
 			options.Host = c.Host
 		}
@@ -40,19 +53,32 @@ func New(config ...Config) *Store {
 		if c.Database != 0 {
 			options.Database = c.Database
 		}
-		if c.Password != "" {
-			options.Password = c.Password
-		}
 		if c.Username != "" {
 			options.Username = c.Username
 		}
+		if c.Password != "" {
+			options.Password = c.Password
+		}
 	}
 
-	return &Store{client: redis.New(options)}
+	Databases[dbName] = &Database{client: redis.New(options)}
+	return Databases[dbName]
+}
+
+func GetDatabase(name ...string) (*Database, error) {
+	dbName := "main"
+	if len(name) > 0 {
+		dbName = name[0]
+	}
+	db, ok := Databases[dbName]
+	if !ok {
+		return nil, fmt.Errorf("database %s not found", dbName)
+	}
+	return db, nil
 }
 
 // Set 값 저장 (JSON 직렬화)
-func (s *Store) Set(key string, value any, ttl ...time.Duration) error {
+func (d *Database) Set(key string, value any, ttl ...time.Duration) error {
 	jsonData, err := json.Marshal(value)
 	if err != nil {
 		return fmt.Errorf("marshal error: %w", err)
@@ -61,12 +87,12 @@ func (s *Store) Set(key string, value any, ttl ...time.Duration) error {
 	if len(ttl) > 0 {
 		exp = ttl[0]
 	}
-	return s.client.Set(key, jsonData, exp)
+	return d.client.Set(key, jsonData, exp)
 }
 
 // Get 값 조회 (구조체 언마샬링)
-func (s *Store) Get(key string, dest any) error {
-	value, err := s.client.Get(key)
+func (d *Database) Get(key string, dest any) error {
+	value, err := d.client.Get(key)
 	if err != nil {
 		return fmt.Errorf("redis error: %w", err)
 	}
@@ -76,44 +102,50 @@ func (s *Store) Get(key string, dest any) error {
 	return json.Unmarshal(value, dest)
 }
 
-func (s *Store) GetString(key string) (string, error) {
+func (d *Database) GetString(key string) (string, error) {
 	var data string
-	err := s.Get(key, &data)
+	err := d.Get(key, &data)
 	return data, err
 }
 
-func (s *Store) GetInt(key string) (int, error) {
+func (d *Database) GetInt(key string) (int, error) {
 	var data int
-	err := s.Get(key, &data)
+	err := d.Get(key, &data)
 	return data, err
 }
 
-func (s *Store) GetFloat(key string) (float64, error) {
+func (d *Database) GetFloat(key string) (float64, error) {
 	var data float64
-	err := s.Get(key, &data)
+	err := d.Get(key, &data)
 	return data, err
 }
 
-func (s *Store) GetBool(key string) (bool, error) {
+func (d *Database) GetBool(key string) (bool, error) {
 	var data bool
-	err := s.Get(key, &data)
+	err := d.Get(key, &data)
 	return data, err
 }
 
 // Delete 키 삭제
-func (s *Store) Delete(key string) error {
-	return s.client.Delete(key)
+func (d *Database) Delete(key string) error {
+	return d.client.Delete(key)
 }
 
 // Reset 전체 삭제 (안전 장치 추가)
-func (s *Store) Reset(confirm bool) error {
+func (d *Database) Reset(confirm bool) error {
 	if !confirm {
 		return errors.New("reset not confirmed")
 	}
-	return s.client.Reset()
+	return d.client.Reset()
 }
 
 // Close 종료
-func (s *Store) Close() {
-	s.client.Close()
+func (d *Database) Close() {
+	d.client.Close()
+}
+
+func Close() {
+	for _, database := range Databases {
+		database.Close()
+	}
 }

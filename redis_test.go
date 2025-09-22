@@ -38,7 +38,6 @@ func TestRedis(t *testing.T) {
 	if err := rds.Get("test", &user); err != nil {
 		t.Error("Get error:", err)
 	}
-
 	if user.Name != "Alice" {
 		t.Error("Wrong result")
 	}

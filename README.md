@@ -40,16 +40,16 @@ func main() {
 
 	// 사용자 정의 설정
 	/*
-		store := redis.New(redis.Config{
-			Host:     "localhost",
-			Port:     6380,
-			Password: "mypassword",
-			Database: 1,
-		})
+	rds := redis.New(redis.Config{
+		Host:     "localhost",
+		Port:     6380,
+		Password: "mypassword",
+		Database: 1,
+	})
 	*/
 
 	// 값 저장
-	err := store.Set("user:1", map[string]interface{}{
+	err := rds.Set("user:1", map[string]interface{}{
 		"name": "Alice",
 		"age":  30,
 	}, 10*time.Minute)
@@ -62,13 +62,13 @@ func main() {
 		Name string `json:"name"`
 		Age  int    `json:"age"`
 	}
-	if err := store.Get("user:1", &user); err != nil {
+	if err := rds.Get("user:1", &user); err != nil {
 		log.Fatal("Get error:", err)
 	}
 	fmt.Println("User:", user)
 
 	// 키 삭제
-	_ = store.Delete("user:1")
+	_ = rds.Delete("user:1")
 
 	// 전체 삭제 (안전장치: true 전달)
 	// _ = store.Reset(true)
