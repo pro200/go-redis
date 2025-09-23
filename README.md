@@ -33,6 +33,11 @@ import (
 	"github.com/pro200/go-redis" // 모듈 경로에 맞게 수정
 )
 
+type User struct {
+	Name string
+	Age  int
+}
+
 func main() {
 	// Redis 클라이언트 생성 (기본 설정)
 	store := redis.New()
@@ -49,7 +54,7 @@ func main() {
 	*/
 
 	// 값 저장
-	err := rds.Set("user:1", map[string]interface{}{
+	err := rds.Set("user:1", User{
 		"name": "Alice",
 		"age":  30,
 	}, 10*time.Minute)
@@ -58,10 +63,7 @@ func main() {
 	}
 
 	// 구조체로 값 조회
-	var user struct {
-		Name string `json:"name"`
-		Age  int    `json:"age"`
-	}
+	var user User
 	if err := rds.Get("user:1", &user); err != nil {
 		log.Fatal("Get error:", err)
 	}

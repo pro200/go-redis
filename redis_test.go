@@ -7,11 +7,6 @@ import (
 	"github.com/pro200/go-redis"
 )
 
-type User struct {
-	Name string `json:"name"`
-	Age  int    `json:"age"`
-}
-
 func TestRedis(t *testing.T) {
 	// redis.io: database-dev for dev
 	rds := redis.New(redis.Config{
@@ -23,7 +18,10 @@ func TestRedis(t *testing.T) {
 	defer rds.Close()
 
 	// 값 저장
-	err := rds.Set("test", User{
+	err := rds.Set("test", struct {
+		Name string
+		Age  int
+	}{
 		Name: "Alice",
 		Age:  18,
 	}, 10*time.Minute)
@@ -33,11 +31,15 @@ func TestRedis(t *testing.T) {
 	}
 
 	// 구조체로 값 조회
-	var user User
+	var user struct {
+		Name string
+		Age  int
+	}
 
 	if err := rds.Get("test", &user); err != nil {
 		t.Error("Get error:", err)
 	}
+
 	if user.Name != "Alice" {
 		t.Error("Wrong result")
 	}
