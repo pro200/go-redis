@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"sync"
 	"time"
 
 	"github.com/gofiber/storage/redis/v3"
@@ -23,7 +24,10 @@ type Database struct {
 	client *redis.Storage
 }
 
-var Databases = make(map[string]*Database)
+var (
+	Databases = make(map[string]*Database)
+	dbMu      sync.RWMutex // 동시성 안전 보장
+)
 
 // New 생성자
 func New(config ...Config) *Database {
@@ -61,11 +65,19 @@ func New(config ...Config) *Database {
 		}
 	}
 
-	Databases[dbName] = &Database{client: redis.New(options)}
-	return Databases[dbName]
+	database := &Database{client: redis.New(options)}
+
+	dbMu.Lock()
+	Databases[dbName] = database
+	dbMu.Unlock()
+
+	return database
 }
 
 func GetDatabase(name ...string) (*Database, error) {
+	dbMu.RLock()
+	defer dbMu.RUnlock()
+
 	if len(Databases) == 0 {
 		return nil, errors.New("no databases available")
 	}
