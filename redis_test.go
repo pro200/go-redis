@@ -8,13 +8,7 @@ import (
 )
 
 func TestRedis(t *testing.T) {
-	// redis.io: database-dev for dev
-	rds := redis.New(redis.Config{
-		Host:     "redis-15029.c340.ap-northeast-2-1.ec2.redns.redis-cloud.com",
-		Port:     15029,
-		Username: "default",
-		Password: "OuwZQqjmrZMcuIeQtb97E3ATUIXevsEt",
-	})
+	rds := redis.New()
 	defer rds.Close()
 
 	// 값 저장
@@ -48,5 +42,27 @@ func TestRedis(t *testing.T) {
 	err = rds.Delete("test")
 	if err != nil {
 		t.Error("Delete error:", err)
+	}
+
+	// 리스트에 값 추가 및 조회
+	var value = map[string]string{
+		"url":     "pro200.diskn.com/012345/abcdefg",
+		"size":    "1234",
+		"changed": "3",
+	}
+
+	err = rds.RPush("test_list", value)
+	if err != nil {
+		t.Error("Push error:", err)
+	}
+
+	var result map[string]string
+	err = rds.LPop("test_list", &result)
+	if err != nil {
+		t.Error("Pop error:", err)
+	}
+
+	if result["url"] != "pro200.diskn.com/012345/abcdefg" {
+		t.Error("Wrong list result")
 	}
 }

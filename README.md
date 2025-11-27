@@ -10,6 +10,9 @@ Redis에 데이터를 **JSON 직렬화**하여 저장하고, 다양한 타입으
 - `New` : Redis 클라이언트 인스턴스 생성
 - `Set` : 값을 JSON으로 직렬화하여 저장
 - `Get` : Redis에서 JSON 데이터를 가져와 원하는 구조체로 언마샬링
+- `LPush, RPush` : 리스트에 값 추가
+- `LPop, RPop` : 리스트에서 값 제거 및 반환
+- `LLen` : 리스트 길이 조회
 - `Delete` : 키 삭제
 - `Reset` : 전체 데이터 삭제 (확인 플래그 필요)
 - `Close` : 연결 종료
