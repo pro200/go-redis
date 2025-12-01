@@ -1,9 +1,7 @@
 # Redis Store Wrapper (Improved)
 
-이 패키지는 [Fiber Redis Storage](https://github.com/gofiber/storage/tree/main/redis) 기반으로  
 Redis에 데이터를 **JSON 직렬화**하여 저장하고, 다양한 타입으로 안전하게 가져올 수 있도록 개선된 래퍼입니다.  
-전역 인스턴스 대신 구조체(`Store`)를 사용해 멀티 인스턴스 환경에서도 안정적으로 동작합니다.
-
+기존의 단순 문자열 저장 방식을 넘어, 구조체와 같은 복잡한 데이터 타입도 쉽게 다룰 수 있습니다.
 ---
 
 ## ✨ 주요 기능
