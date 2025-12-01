@@ -1,5 +1,6 @@
 # Redis Store Wrapper (Improved)
 
+
 Redis에 데이터를 **JSON 직렬화**하여 저장하고, 다양한 타입으로 안전하게 가져올 수 있도록 개선된 래퍼입니다.  
 기존의 단순 문자열 저장 방식을 넘어, 구조체와 같은 복잡한 데이터 타입도 쉽게 다룰 수 있습니다.
 ---
@@ -42,7 +43,7 @@ type User struct {
 func main() {
 	// Redis 클라이언트 생성 (기본 설정)
 	rds := redis.New()
-	defer store.Close()
+	defer rds.Close()
 
 	// 사용자 정의 설정
 	/*
