@@ -20,7 +20,7 @@ Redis에 데이터를 **JSON 직렬화**하여 저장하고, 다양한 타입으
 
 ## 📦 설치
 ```bash
-go get github.com/gofiber/storage/redis/v3
+go get github.com/pro200/go-redis
 ```
 
 ## 🚀 사용 예시
