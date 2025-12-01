@@ -43,7 +43,7 @@ type User struct {
 
 func main() {
 	// Redis 클라이언트 생성 (기본 설정)
-	store := redis.New()
+	rds := redis.New()
 	defer store.Close()
 
 	// 사용자 정의 설정
@@ -52,7 +52,6 @@ func main() {
 		Host:     "localhost",
 		Port:     6380,
 		Password: "mypassword",
-		Database: 1,
 	})
 	*/
 
@@ -83,12 +82,12 @@ func main() {
 ## ⚙️ 기본 Config
 ```go
 redis.Config{
+	Name:      "main",
 	Host:      "127.0.0.1",
 	Port:      6379,
 	Database:  0,
 	Username:  "",
 	Password:  "",
-	Reset:     false,
 	TLSConfig: nil,
 	PoolSize:  10 * runtime.GOMAXPROCS(0),
 }
