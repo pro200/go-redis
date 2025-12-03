@@ -1,14 +1,14 @@
 # Redis Store Wrapper (Improved)
 
 
-Redis에 데이터를 **JSON 직렬화**하여 저장하고, 다양한 타입으로 안전하게 가져올 수 있도록 개선된 래퍼입니다.  
+Redis에 데이터를 **messagePack 직렬화**하여 저장하고, 다양한 타입으로 안전하게 가져올 수 있도록 개선된 래퍼입니다.  
 기존의 단순 문자열 저장 방식을 넘어, 구조체와 같은 복잡한 데이터 타입도 쉽게 다룰 수 있습니다.
 ---
 
 ## ✨ 주요 기능
 - `New` : Redis 클라이언트 인스턴스 생성
-- `Set` : 값을 JSON으로 직렬화하여 저장
-- `Get` : Redis에서 JSON 데이터를 가져와 원하는 구조체로 언마샬링
+- `Set` : 값을 messagePack으로 직렬화하여 저장
+- `Get` : Redis에서 messagePack 데이터를 가져와 원하는 구조체로 언마샬링
 - `LPush, RPush` : 리스트에 값 추가
 - `LPop, RPop` : 리스트에서 값 제거 및 반환
 - `LLen` : 리스트 길이 조회
@@ -36,8 +36,8 @@ import (
 )
 
 type User struct {
-	Name string
-	Age  int
+	Name string `msgpack:"name"`
+	Age  int    `msgpack:"age"`
 }
 
 func main() {
@@ -73,15 +73,12 @@ func main() {
 	// 키 삭제
 	_ = rds.Delete("user:1")
 
-	// 전체 삭제 (안전장치: true 전달)
-	// _ = store.Reset(true)
 }
 ```
 
 ## ⚙️ 기본 Config
 ```go
 redis.Config{
-	Name:      "main",
 	Host:      "127.0.0.1",
 	Port:      6379,
 	Database:  0,
