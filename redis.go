@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
-	//"sync"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -13,7 +12,6 @@ import (
 )
 
 type Config struct {
-	//Name     string
 	Host     string
 	Port     int
 	Database int
@@ -26,26 +24,8 @@ type Database struct {
 	ctx    context.Context
 }
 
-//var (
-//	Databases = make(map[string]*Database)
-//	dbMu      sync.RWMutex
-//)
-
-// Host/Port 안전 포맷
-//func NewRedisAddr(host string, port int) string {
-//	if host == "" {
-//		host = "127.0.0.1"
-//	}
-//	if port == 0 {
-//		port = 6379
-//	}
-//	return fmt.Sprintf("%s:%d", host, port)
-//}
-
-// New: 생성자
-func New(cfg ...Config) *Database {
+func NewDatabase(cfg ...Config) *Database {
 	c := Config{
-		//Name:     "main",
 		Host:     "127.0.0.1",
 		Port:     6379,
 		Database: 0,
@@ -53,9 +33,6 @@ func New(cfg ...Config) *Database {
 
 	if len(cfg) > 0 {
 		tmp := cfg[0]
-		//if tmp.Name != "" {
-		//	c.Name = tmp.Name
-		//}
 		if tmp.Host != "" {
 			c.Host = tmp.Host
 		}
@@ -81,56 +58,15 @@ func New(cfg ...Config) *Database {
 		PoolSize: 10 * runtime.GOMAXPROCS(0),
 	}
 
-	//db := &Database{
-	//	client: redis.NewClient(options),
-	//	ctx:    context.Background(),
-	//}
-	//
-	//dbMu.Lock()
-	//Databases[c.Name] = db
-	//dbMu.Unlock()
-	//
-	//return db
-
 	return &Database{
 		client: redis.NewClient(options),
 		ctx:    context.Background(),
 	}
 }
 
-// Load: 이름으로 DB 가져오기
-//func Load(name ...string) (*Database, error) {
-//	dbMu.RLock()
-//	defer dbMu.RUnlock()
-//
-//	if len(Databases) == 0 {
-//		return nil, errors.New("no databases available")
-//	}
-//
-//	dbName := "main"
-//	if len(name) > 0 {
-//		dbName = name[0]
-//	}
-//
-//	db, ok := Databases[dbName]
-//	if !ok {
-//		return nil, fmt.Errorf("database %s not found", dbName)
-//	}
-//	return db, nil
-//}
-
-// ===== MessagePack 기반 저장/조회 =====
-func (d *Database) pack(value any) ([]byte, error) {
-	return msgpack.Marshal(value)
-}
-
-func (d *Database) unpack(data []byte, dest any) error {
-	return msgpack.Unmarshal(data, dest)
-}
-
-// Set / Get
+// Set & Get
 func (d *Database) Set(key string, value any, ttl ...time.Duration) error {
-	data, err := d.pack(value)
+	data, err := pack(value)
 	if err != nil {
 		return fmt.Errorf("msgpack marshal failed: %w", err)
 	}
@@ -152,48 +88,48 @@ func (d *Database) Get(key string, dest any) error {
 		return fmt.Errorf("redis get error: %w", err)
 	}
 
-	return d.unpack(data, dest)
+	return unpack(data, dest)
 }
 
 // Push / Pop
 func (d *Database) LPush(key string, value any) error {
-	return d.push("L", key, value)
+	return push(d, "L", key, value)
 }
 
 func (d *Database) RPush(key string, value any) error {
-	return d.push("R", key, value)
+	return push(d, "R", key, value)
 }
 
-func (d *Database) push(direction, key string, value any) error {
-	data, err := d.pack(value)
+func push(db *Database, direction, key string, value any) error {
+	data, err := pack(value)
 	if err != nil {
 		return fmt.Errorf("msgpack marshal failed: %w", err)
 	}
 
 	if normalizeDir(direction) == "L" {
-		return d.client.LPush(d.ctx, key, data).Err()
+		return db.client.LPush(db.ctx, key, data).Err()
 	}
-	return d.client.RPush(d.ctx, key, data).Err()
+	return db.client.RPush(db.ctx, key, data).Err()
 }
 
 func (d *Database) LPop(key string, dest any) error {
-	return d.pop("L", key, dest)
+	return pop(d, "L", key, dest)
 }
 
 func (d *Database) RPop(key string, dest any) error {
-	return d.pop("R", key, dest)
+	return pop(d, "R", key, dest)
 }
 
-func (d *Database) pop(direction, key string, dest any) error {
+func pop(db *Database, direction, key string, dest any) error {
 	var (
-		data string
+		data []byte
 		err  error
 	)
 
 	if normalizeDir(direction) == "L" {
-		data, err = d.client.LPop(d.ctx, key).Result()
+		data, err = db.client.LPop(db.ctx, key).Bytes()
 	} else {
-		data, err = d.client.RPop(d.ctx, key).Result()
+		data, err = db.client.RPop(db.ctx, key).Bytes()
 	}
 
 	if errors.Is(err, redis.Nil) {
@@ -203,7 +139,11 @@ func (d *Database) pop(direction, key string, dest any) error {
 		return fmt.Errorf("redis pop error: %w", err)
 	}
 
-	return d.unpack([]byte(data), dest)
+	return unpack(data, dest)
+}
+
+func (d *Database) LTrim(key string, start, stop int64) error {
+	return d.client.LTrim(d.ctx, key, start, stop).Err()
 }
 
 // Helpers
@@ -240,17 +180,17 @@ func (d *Database) Close() {
 	d.client.Close()
 }
 
-//func CloseAll() {
-//	dbMu.Lock()
-//	defer dbMu.Unlock()
-//
-//	for _, db := range Databases {
-//		db.client.Close()
-//	}
-//	Databases = make(map[string]*Database)
-//}
+/*
+ * 내부 함수
+ */
+func pack(value any) ([]byte, error) {
+	return msgpack.Marshal(value)
+}
 
-// 내부 함수
+func unpack(data []byte, dest any) error {
+	return msgpack.Unmarshal(data, dest)
+}
+
 func normalizeDir(dir string) string {
 	switch dir {
 	case "Left", "L", "l":
