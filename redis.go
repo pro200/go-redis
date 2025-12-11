@@ -156,8 +156,8 @@ func (d *Database) GetString(key string) (string, error) {
 	return v, d.Get(key, &v)
 }
 
-func (d *Database) GetInt(key string) (int, error) {
-	var v int
+func (d *Database) GetInt(key string) (int64, error) {
+	var v int64
 	return v, d.Get(key, &v)
 }
 

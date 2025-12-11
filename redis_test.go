@@ -8,8 +8,8 @@ import (
 )
 
 type User struct {
-	Name string
-	Age  int
+	Name string `msgpack:"name"`
+	Age  int    `msgpack:"age"`
 }
 
 func TestRedis(t *testing.T) {
