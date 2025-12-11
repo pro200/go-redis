@@ -13,11 +13,14 @@ type User struct {
 }
 
 func TestRedis(t *testing.T) {
-	rds := redis.NewDatabase()
+	rds, err := redis.NewDatabase()
+	if err != nil {
+		t.Error("NewDatabase error:", err)
+	}
 	defer rds.Close()
 
 	// 값 저장
-	err := rds.Set("test", User{
+	err = rds.Set("test", User{
 		Name: "Alice",
 		Age:  30,
 	}, time.Minute*5)

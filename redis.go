@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"runtime"
+	"strconv"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -20,11 +22,12 @@ type Config struct {
 }
 
 type Database struct {
-	client *redis.Client
-	ctx    context.Context
+	version float64
+	client  *redis.Client
+	ctx     context.Context
 }
 
-func NewDatabase(cfg ...Config) *Database {
+func NewDatabase(cfg ...Config) (*Database, error) {
 	c := Config{
 		Host:     "127.0.0.1",
 		Port:     6379,
@@ -58,10 +61,27 @@ func NewDatabase(cfg ...Config) *Database {
 		PoolSize: 10 * runtime.GOMAXPROCS(0),
 	}
 
-	return &Database{
+	database := &Database{
 		client: redis.NewClient(options),
 		ctx:    context.Background(),
 	}
+
+	// 버전 확인
+	info, err := database.client.Info(database.ctx, "server").Result()
+	if err != nil {
+		return nil, fmt.Errorf("redis info fetch failed: %v", err)
+	}
+
+	re := regexp.MustCompile(`redis_version:(\d+)\.(\d+)`)
+	m := re.FindStringSubmatch(info)
+	if len(m) < 3 {
+		return nil, fmt.Errorf("redis_version not found in INFO")
+	}
+	major, _ := strconv.Atoi(m[1])
+	minor, _ := strconv.Atoi(m[2])
+	database.version, _ = strconv.ParseFloat(fmt.Sprintf("%d.%d", major, minor), 64)
+
+	return database, nil
 }
 
 // Set & Get
@@ -140,6 +160,65 @@ func pop(db *Database, direction, key string, dest any) error {
 	}
 
 	return unpack(data, dest)
+}
+
+func (d *Database) LPopCount(key string, count int, dest any) error {
+	return popCount(d, "L", key, count, dest)
+}
+
+func (d *Database) RPopCount(key string, count int, dest any) error {
+	return popCount(d, "R", key, count, dest)
+}
+
+func popCount(db *Database, direction, key string, count int, dest any) error {
+	// Redis 6.2 미만
+	if db.version < 6.2 {
+		return fmt.Errorf("redis version %.2f does not support LPopCount/RPopCount", db.version)
+	}
+
+	if count <= 0 {
+		return fmt.Errorf("count must be positive")
+	}
+
+	var (
+		data []string
+		err  error
+	)
+
+	if normalizeDir(direction) == "L" {
+		data, err = db.client.LPopCount(db.ctx, key, count).Result()
+	} else {
+		data, err = db.client.RPopCount(db.ctx, key, count).Result()
+	}
+
+	if errors.Is(err, redis.Nil) || len(data) == 0 {
+		return fmt.Errorf("no items in list: %s", key)
+	}
+	if err != nil {
+		return fmt.Errorf("redis pop count error: %w", err)
+	}
+
+	// dest는 *[]T 이어야 함
+	// data = []string → msgpack 여러 개 언패킹
+	// 슬라이스 준비
+	slice := make([]any, 0, len(data))
+
+	for _, s := range data {
+		var item any
+		// string → []byte
+		if err := msgpack.Unmarshal([]byte(s), &item); err != nil {
+			return fmt.Errorf("msgpack unmarshal failed: %w", err)
+		}
+		slice = append(slice, item)
+	}
+
+	// []any → 최종 dest 타입으로 언패킹
+	packed, err := msgpack.Marshal(slice)
+	if err != nil {
+		return fmt.Errorf("slice repack failed: %w", err)
+	}
+
+	return msgpack.Unmarshal(packed, dest)
 }
 
 func (d *Database) LTrim(key string, start, stop int64) error {
