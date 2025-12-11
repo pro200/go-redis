@@ -171,11 +171,6 @@ func (d *Database) RPopCount(key string, count int, dest any) error {
 }
 
 func popCount(db *Database, direction, key string, count int, dest any) error {
-	// Redis 6.2 미만
-	if db.version < 6.2 {
-		return fmt.Errorf("redis version %.2f does not support LPopCount/RPopCount", db.version)
-	}
-
 	if count <= 0 {
 		return fmt.Errorf("count must be positive")
 	}
@@ -185,22 +180,50 @@ func popCount(db *Database, direction, key string, count int, dest any) error {
 		err  error
 	)
 
-	if normalizeDir(direction) == "L" {
-		data, err = db.client.LPopCount(db.ctx, key, count).Result()
+	if db.version >= 6.2 {
+		if normalizeDir(direction) == "L" {
+			data, err = db.client.LPopCount(db.ctx, key, count).Result()
+		} else {
+			data, err = db.client.RPopCount(db.ctx, key, count).Result()
+		}
+
+		if errors.Is(err, redis.Nil) || len(data) == 0 {
+			return fmt.Errorf("no items in list: %s", key)
+		}
+		if err != nil {
+			return fmt.Errorf("redis pop count error: %w", err)
+		}
 	} else {
-		data, err = db.client.RPopCount(db.ctx, key, count).Result()
+		// Redis 6.2 미만에서는 여러 개 팝을 지원하지 않음
+		pipe := db.client.TxPipeline()
+
+		// 0 ~ count-1 까지 가져오기
+		r1 := pipe.LRange(db.ctx, key, 0, int64(count-1))
+		// 앞에서 count 개 잘라내기
+		pipe.LTrim(db.ctx, key, int64(count), -1)
+
+		_, err := pipe.Exec(db.ctx)
+		if err != nil && !errors.Is(err, redis.Nil) {
+			return fmt.Errorf("redis transaction error: %w", err)
+		}
+
+		items, err := r1.Result()
+		if err != nil && !errors.Is(err, redis.Nil) {
+			return fmt.Errorf("lrange error: %w", err)
+		}
+
+		if len(items) == 0 {
+			return fmt.Errorf("no items in list: %s", key)
+		}
+
+		data = items
 	}
 
-	if errors.Is(err, redis.Nil) || len(data) == 0 {
-		return fmt.Errorf("no items in list: %s", key)
-	}
-	if err != nil {
-		return fmt.Errorf("redis pop count error: %w", err)
-	}
-
+	/*
+	 * Decode
+	 */
 	// dest는 *[]T 이어야 함
 	// data = []string → msgpack 여러 개 언패킹
-	// 슬라이스 준비
 	slice := make([]any, 0, len(data))
 
 	for _, s := range data {
