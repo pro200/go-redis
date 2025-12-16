@@ -84,13 +84,6 @@ func NewDatabase(cfg ...Config) (*Database, error) {
 	return database, nil
 }
 
-func NewZ(score float64, member any) redis.Z {
-	return redis.Z{
-		Score:  score,
-		Member: member,
-	}
-}
-
 // Set & Get
 func (d *Database) Set(key string, value any, ttl ...time.Duration) error {
 	data, err := pack(value)
