@@ -21,8 +21,6 @@ type Config struct {
 	Password string
 }
 
-var Z redis.Z
-
 type Database struct {
 	Version float64
 	Client  *redis.Client
@@ -84,6 +82,13 @@ func NewDatabase(cfg ...Config) (*Database, error) {
 	database.Version, _ = strconv.ParseFloat(fmt.Sprintf("%d.%d", major, minor), 64)
 
 	return database, nil
+}
+
+func NewZ(score float64, member any) redis.Z {
+	return redis.Z{
+		Score:  score,
+		Member: member,
+	}
 }
 
 // Set & Get
