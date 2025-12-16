@@ -25,6 +25,7 @@ type Database struct {
 	Version float64
 	Client  *redis.Client
 	Ctx     context.Context
+	Z       redis.Z
 }
 
 func NewDatabase(cfg ...Config) (*Database, error) {
@@ -64,6 +65,7 @@ func NewDatabase(cfg ...Config) (*Database, error) {
 	database := &Database{
 		Client: redis.NewClient(options),
 		Ctx:    context.Background(),
+		Z:      redis.Z{},
 	}
 
 	// 버전 확인
