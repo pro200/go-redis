@@ -22,9 +22,9 @@ type Config struct {
 }
 
 type Database struct {
-	version float64
-	client  *redis.Client
-	ctx     context.Context
+	Version float64
+	Client  *redis.Client
+	Ctx     context.Context
 }
 
 func NewDatabase(cfg ...Config) (*Database, error) {
@@ -62,12 +62,12 @@ func NewDatabase(cfg ...Config) (*Database, error) {
 	}
 
 	database := &Database{
-		client: redis.NewClient(options),
-		ctx:    context.Background(),
+		Client: redis.NewClient(options),
+		Ctx:    context.Background(),
 	}
 
 	// 버전 확인
-	info, err := database.client.Info(database.ctx, "server").Result()
+	info, err := database.Client.Info(database.Ctx, "server").Result()
 	if err != nil {
 		return nil, fmt.Errorf("redis info fetch failed: %v", err)
 	}
@@ -79,7 +79,7 @@ func NewDatabase(cfg ...Config) (*Database, error) {
 	}
 	major, _ := strconv.Atoi(m[1])
 	minor, _ := strconv.Atoi(m[2])
-	database.version, _ = strconv.ParseFloat(fmt.Sprintf("%d.%d", major, minor), 64)
+	database.Version, _ = strconv.ParseFloat(fmt.Sprintf("%d.%d", major, minor), 64)
 
 	return database, nil
 }
@@ -96,11 +96,11 @@ func (d *Database) Set(key string, value any, ttl ...time.Duration) error {
 		exp = ttl[0]
 	}
 
-	return d.client.Set(d.ctx, key, data, exp).Err()
+	return d.Client.Set(d.Ctx, key, data, exp).Err()
 }
 
 func (d *Database) Get(key string, dest any) error {
-	data, err := d.client.Get(d.ctx, key).Bytes()
+	data, err := d.Client.Get(d.Ctx, key).Bytes()
 	if errors.Is(err, redis.Nil) {
 		return errors.New("key not found")
 	}
@@ -127,9 +127,9 @@ func push(db *Database, direction, key string, value any) error {
 	}
 
 	if normalizeDir(direction) == "L" {
-		return db.client.LPush(db.ctx, key, data).Err()
+		return db.Client.LPush(db.Ctx, key, data).Err()
 	}
-	return db.client.RPush(db.ctx, key, data).Err()
+	return db.Client.RPush(db.Ctx, key, data).Err()
 }
 
 func (d *Database) LPop(key string, dest any) error {
@@ -147,9 +147,9 @@ func pop(db *Database, direction, key string, dest any) error {
 	)
 
 	if normalizeDir(direction) == "L" {
-		data, err = db.client.LPop(db.ctx, key).Bytes()
+		data, err = db.Client.LPop(db.Ctx, key).Bytes()
 	} else {
-		data, err = db.client.RPop(db.ctx, key).Bytes()
+		data, err = db.Client.RPop(db.Ctx, key).Bytes()
 	}
 
 	if errors.Is(err, redis.Nil) {
@@ -180,11 +180,11 @@ func popCount(db *Database, direction, key string, count int, dest any) error {
 		err  error
 	)
 
-	if db.version >= 6.2 {
+	if db.Version >= 6.2 {
 		if normalizeDir(direction) == "L" {
-			data, err = db.client.LPopCount(db.ctx, key, count).Result()
+			data, err = db.Client.LPopCount(db.Ctx, key, count).Result()
 		} else {
-			data, err = db.client.RPopCount(db.ctx, key, count).Result()
+			data, err = db.Client.RPopCount(db.Ctx, key, count).Result()
 		}
 
 		if errors.Is(err, redis.Nil) || len(data) == 0 {
@@ -195,14 +195,14 @@ func popCount(db *Database, direction, key string, count int, dest any) error {
 		}
 	} else {
 		// Redis 6.2 미만에서는 여러 개 팝을 지원하지 않음
-		pipe := db.client.TxPipeline()
+		pipe := db.Client.TxPipeline()
 
 		// 0 ~ count-1 까지 가져오기
-		r1 := pipe.LRange(db.ctx, key, 0, int64(count-1))
+		r1 := pipe.LRange(db.Ctx, key, 0, int64(count-1))
 		// 앞에서 count 개 잘라내기
-		pipe.LTrim(db.ctx, key, int64(count), -1)
+		pipe.LTrim(db.Ctx, key, int64(count), -1)
 
-		_, err := pipe.Exec(db.ctx)
+		_, err := pipe.Exec(db.Ctx)
 		if err != nil && !errors.Is(err, redis.Nil) {
 			return fmt.Errorf("redis transaction error: %w", err)
 		}
@@ -245,12 +245,12 @@ func popCount(db *Database, direction, key string, count int, dest any) error {
 }
 
 func (d *Database) LTrim(key string, start, stop int64) error {
-	return d.client.LTrim(d.ctx, key, start, stop).Err()
+	return d.Client.LTrim(d.Ctx, key, start, stop).Err()
 }
 
 // Helpers
 func (d *Database) LLen(key string) (int64, error) {
-	return d.client.LLen(d.ctx, key).Result()
+	return d.Client.LLen(d.Ctx, key).Result()
 }
 
 func (d *Database) GetString(key string) (string, error) {
@@ -274,12 +274,12 @@ func (d *Database) GetBool(key string) (bool, error) {
 }
 
 func (d *Database) Delete(key string) error {
-	return d.client.Del(d.ctx, key).Err()
+	return d.Client.Del(d.Ctx, key).Err()
 }
 
 // Close
 func (d *Database) Close() {
-	d.client.Close()
+	d.Client.Close()
 }
 
 /*
