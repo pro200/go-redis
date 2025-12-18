@@ -244,10 +244,6 @@ func popCount(db *Database, direction, key string, count int, dest any) error {
 	return msgpack.Unmarshal(packed, dest)
 }
 
-func (d *Database) LTrim(key string, start, stop int64) error {
-	return d.Client.LTrim(d.Ctx, key, start, stop).Err()
-}
-
 func (d *Database) LPos(key string, value any) (int, error) {
 	data, err := pack(value)
 	if err != nil {
@@ -267,6 +263,10 @@ func (d *Database) LPos(key string, value any) (int, error) {
 	}
 
 	return int(index), nil
+}
+
+func (d *Database) LTrim(key string, start, stop int64) error {
+	return d.Client.LTrim(d.Ctx, key, start, stop).Err()
 }
 
 // Helpers
