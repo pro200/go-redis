@@ -248,6 +248,27 @@ func (d *Database) LTrim(key string, start, stop int64) error {
 	return d.Client.LTrim(d.Ctx, key, start, stop).Err()
 }
 
+func (d *Database) LPos(key string, value any) (int, error) {
+	data, err := pack(value)
+	if err != nil {
+		return -1, fmt.Errorf("msgpack marshal failed: %w", err)
+	}
+
+	posCmd := d.Client.LPos(d.Ctx, key, string(data), redis.LPosArgs{})
+
+	// Get the result (index)
+	index, err := posCmd.Result()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			// Element not found
+			return -1, fmt.Errorf("no items in list: %s", key)
+		}
+		return -1, fmt.Errorf("failed to get LPOS result: %w", err)
+	}
+
+	return int(index), nil
+}
+
 // Helpers
 func (d *Database) LLen(key string) (int64, error) {
 	return d.Client.LLen(d.Ctx, key).Result()
