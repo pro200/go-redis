@@ -301,3 +301,7 @@ func normalizeDir(dir string) string {
 		return "R"
 	}
 }
+
+func IsNil(value any) bool {
+	return value == redis.Nil
+}
