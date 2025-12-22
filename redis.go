@@ -269,11 +269,13 @@ func (d *Database) LTrim(key string, start, stop int64) error {
 	return d.Client.LTrim(d.Ctx, key, start, stop).Err()
 }
 
-// Helpers
 func (d *Database) LLen(key string) (int64, error) {
 	return d.Client.LLen(d.Ctx, key).Result()
 }
 
+/*
+ * Helpers
+ */
 func (d *Database) GetString(key string) (string, error) {
 	var v string
 	return v, d.Get(key, &v)
@@ -323,6 +325,9 @@ func normalizeDir(dir string) string {
 	}
 }
 
+/*
+ * 외부 함수
+ */
 func IsNil(value any) bool {
 	return value == redis.Nil
 }
